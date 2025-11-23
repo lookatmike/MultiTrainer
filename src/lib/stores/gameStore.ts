@@ -126,28 +126,58 @@ function createGameStore() {
 	};
 }
 
-// Generate random questions based on config
+// Fisher-Yates shuffle algorithm
+function shuffleArray<T>(array: T[]): T[] {
+	const result = [...array];
+	for (let i = result.length - 1; i > 0; i--) {
+		const j = Math.floor(Math.random() * (i + 1));
+		[result[i], result[j]] = [result[j], result[i]];
+	}
+	return result;
+}
+
+// Generate questions like a deck of cards - no repeats unless necessary
 function generateQuestions(config: GameConfig): Question[] {
+	// Generate all possible questions
+	const allPossibleQuestions: Question[] = [];
+
+	const [min, max] = config.secondFactorRange;
+
+	for (const factor1 of config.firstFactors) {
+		for (let factor2 = min; factor2 <= max; factor2++) {
+			allPossibleQuestions.push({
+				factor1,
+				factor2,
+				correctAnswer: factor1 * factor2,
+				playerAnswer: null,
+				timeUsed: 0,
+				bonus: 0
+			});
+		}
+	}
+
+	// If no possible questions, return empty array
+	if (allPossibleQuestions.length === 0) {
+		return [];
+	}
+
+	// Draw from the "deck" - shuffle and deal, reshuffle when needed
 	const questions: Question[] = [];
+	let remaining = config.totalQuestions;
 
-	for (let i = 0; i < config.totalQuestions; i++) {
-		// Random first factor from the list
-		const factor1 = config.firstFactors[
-			Math.floor(Math.random() * config.firstFactors.length)
-		];
+	while (remaining > 0) {
+		// Shuffle the deck
+		const shuffled = shuffleArray(allPossibleQuestions);
 
-		// Random second factor from the range
-		const [min, max] = config.secondFactorRange;
-		const factor2 = Math.floor(Math.random() * (max - min + 1)) + min;
+		// Take as many as we need (or all available if we need more)
+		const toTake = Math.min(remaining, shuffled.length);
 
-		questions.push({
-			factor1,
-			factor2,
-			correctAnswer: factor1 * factor2,
-			playerAnswer: null,
-			timeUsed: 0,
-			bonus: 0
-		});
+		for (let i = 0; i < toTake; i++) {
+			// Create a copy so each question is independent
+			questions.push({ ...shuffled[i] });
+		}
+
+		remaining -= toTake;
 	}
 
 	return questions;

@@ -38,11 +38,7 @@ This setup ensures the app runs entirely in the browser without SSR.
 
 **Centralized Store:** `src/lib/stores/gameStore.ts`
 
-Uses Svelte's writable stores and a factory pattern:
-
-```typescript
-const game = createGameStore();
-```
+Uses Svelte's writable stores with a factory pattern (`createGameStore()`).
 
 **Key stores:**
 
@@ -67,15 +63,7 @@ const game = createGameStore();
 
 **Main App Flow:** `src/routes/+page.svelte`
 
-```svelte
-{#if $gameState === 'SETUP'}
-  <SetupScreen />
-{:else if $gameState === 'PLAYING'}
-  <GameScreen />
-{:else if $gameState === 'RESULTS'}
-  <ResultsScreen />
-{/if}
-```
+Uses a state machine pattern with conditional rendering based on `$gameState`. Shows one of three screens at a time: SetupScreen, GameScreen, or ResultsScreen.
 
 **Component Hierarchy:**
 
@@ -130,7 +118,7 @@ const game = createGameStore();
 
 2. **PLAYING Phase:**
 
-   - Questions generated randomly from factor pools
+   - Questions generated using "deck of cards" algorithm (see below)
    - Timer starts at `timePerQuestion` and counts down
    - Color transitions: green (60%+) → yellow (30-60%) → red (<30%)
    - Bonus zone active during first 60% of time (last 40% elapsed)
@@ -155,18 +143,7 @@ const game = createGameStore();
 
 ### Timer Implementation (GameScreen.svelte)
 
-```typescript
-timerInterval = window.setInterval(() => {
-  timeRemaining.update((t) => {
-    const newTime = t - 0.1;
-    if (newTime <= 0) {
-      handleTimeout();
-      return 0;
-    }
-    return newTime;
-  });
-}, 100);
-```
+The timer uses `setInterval` to update every 100ms for smooth progress bar animation. Key details:
 
 - Updates every 100ms for smooth progress bar
 - Bonus threshold: `timeRemaining >= totalTime * 0.6`
@@ -180,10 +157,32 @@ Three formats supported:
 2. **Range:** "3-7" → `[3,4,5,6,7]`
 3. **List:** "3,4,5" → `[3,4,5]`
 
+**Deduplication:** Duplicate values are automatically removed while preserving input order. For example, "3,5,3,7" becomes `[3,5,7]`.
+
 When returning to setup, factors are formatted back intelligently:
 
 - Continuous ranges display as "3-7"
 - Non-continuous display as "3,5,7"
+
+### Question Generation - "Deck of Cards" Algorithm (gameStore.ts)
+
+Questions are generated to avoid repeats, similar to dealing from a deck of cards:
+
+**Algorithm:**
+
+1. Generate all possible questions (every firstFactor × every secondFactor in range)
+2. Shuffle the complete deck using Fisher-Yates algorithm
+3. Deal questions from the shuffled deck
+4. If more questions needed than available, reshuffle and continue dealing
+
+**Key behaviors:**
+
+- `x×y` and `y×x` are treated as different questions (both exist in the deck)
+- No repeats within a single "pass" through the deck
+- If `totalQuestions > possible questions`, the deck reshuffles after exhaustion
+- Example: 12 possible questions, requesting 25 → shows all 12, reshuffles, shows 13 more
+
+This is implemented in the `generateQuestions()` function in `gameStore.ts`.
 
 ### LocalStorage Persistence (src/lib/utils/storage.ts)
 
@@ -254,23 +253,7 @@ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 
 **File:** `src/lib/stores/gameStore.ts` - `submitAnswer()` method
 
-Current:
-
-```typescript
-const bonusThreshold = $session.config.timePerQuestion * 0.6;
-const earnedBonus = isCorrect && timeUsed >= bonusThreshold ? 5 : 0;
-```
-
-To add tiers:
-
-```typescript
-let earnedBonus = 0;
-if (isCorrect) {
-  const percentRemaining = timeUsed / $session.config.timePerQuestion;
-  if (percentRemaining >= 0.8) earnedBonus = 10; // 80%+ = 10pts
-  else if (percentRemaining >= 0.6) earnedBonus = 5; // 60%+ = 5pts
-}
-```
+Currently uses a single threshold at 60% time remaining for 5-point bonus. To add multiple tiers, modify the bonus calculation logic to check multiple percentage thresholds (e.g., 80%+ = 10pts, 60%+ = 5pts).
 
 ### Changing Color Scheme
 
@@ -282,66 +265,17 @@ Remember to maintain WCAG AAA contrast (7:1 minimum) when changing colors.
 
 ### Adding Question Types (Beyond Multiplication)
 
-1. **Update data model** in `gameStore.ts`:
-
-   ```typescript
-   operation: "multiply" | "add" | "subtract";
-   ```
-
-2. **Modify `generateQuestions()`**:
-
-   ```typescript
-   const operations = {
-     multiply: (a, b) => a * b,
-     add: (a, b) => a + b,
-     subtract: (a, b) => a - b,
-   };
-   correctAnswer: operations[config.operation](factor1, factor2);
-   ```
-
-3. **Update display** in `GameScreen.svelte`:
-   ```svelte
-   <span class="operator">{getOperatorSymbol($currentQuestion.operation)}</span>
-   ```
+1. Add an `operation` field to the data model in `gameStore.ts`
+2. Create an operations lookup to calculate correct answers in `generateQuestions()`
+3. Update the question display in `GameScreen.svelte` to show different operator symbols
 
 ### Adding Sound Effects
 
-Install a package or use Web Audio API:
-
-```typescript
-// In GameScreen.svelte
-function playSound(type: "correct" | "incorrect" | "bonus") {
-  const audio = new Audio(`/sounds/${type}.mp3`);
-  audio.play().catch(() => {}); // Handle autoplay restrictions
-}
-
-// Call in feedback section
-if (isCorrect) {
-  playSound("correct");
-  if (earnedBonus) playSound("bonus");
-}
-```
-
-Add sound files to `static/sounds/`.
+Use Web Audio API or install an audio package. Create a `playSound()` function in `GameScreen.svelte` that plays different sounds for correct/incorrect/bonus events. Add sound files to `static/sounds/` directory.
 
 ### Exporting Score History
 
-Add to `ResultsScreen.svelte`:
-
-```typescript
-import { getPlayerHistory } from "$lib/utils/storage";
-
-function exportHistory() {
-  const history = getPlayerHistory($session.config.playerName);
-  const json = JSON.stringify(history, null, 2);
-  const blob = new Blob([json], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${$session.config.playerName}-scores.json`;
-  a.click();
-}
-```
+Add an export function in `ResultsScreen.svelte` that retrieves player history, converts to JSON, creates a Blob, and triggers a download via a temporary anchor element.
 
 ## Testing Strategy
 
@@ -489,13 +423,7 @@ The `allowedHosts: true` in vite.config.ts allows any hostname.
 ### Browser DevTools
 
 **Check state:**
-Add this temporarily to see store values:
-
-```svelte
-{#if import.meta.env.DEV}
-  <pre>{JSON.stringify($session, null, 2)}</pre>
-{/if}
-```
+Temporarily add a dev-only block that displays store values as JSON in a `<pre>` tag for debugging.
 
 **localStorage inspection:**
 

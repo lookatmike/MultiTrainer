@@ -1,4 +1,5 @@
 import type { GameConfig, Question } from '$lib/stores/gameStore';
+import { STORAGE } from '$lib/constants';
 
 export interface ScoreHistoryEntry {
 	date: number;
@@ -12,15 +13,12 @@ export interface PlayerHistory {
 	scores: ScoreHistoryEntry[];
 }
 
-const STORAGE_KEY = 'multitrainer-history';
-const MAX_SCORES_PER_PLAYER = 50;
-
 // Get all player histories
 export function getAllHistory(): PlayerHistory[] {
 	if (typeof window === 'undefined') return [];
 
 	try {
-		const data = localStorage.getItem(STORAGE_KEY);
+		const data = localStorage.getItem(STORAGE.KEY);
 		return data ? JSON.parse(data) : [];
 	} catch (error) {
 		console.error('Error loading history:', error);
@@ -58,7 +56,7 @@ export function saveScore(
 		if (playerHistory) {
 			// Add new score and keep only the most recent entries
 			playerHistory.scores.unshift(newEntry);
-			playerHistory.scores = playerHistory.scores.slice(0, MAX_SCORES_PER_PLAYER);
+			playerHistory.scores = playerHistory.scores.slice(0, STORAGE.MAX_SCORES);
 		} else {
 			// Create new player history
 			playerHistory = {
@@ -68,7 +66,7 @@ export function saveScore(
 			allHistory.push(playerHistory);
 		}
 
-		localStorage.setItem(STORAGE_KEY, JSON.stringify(allHistory));
+		localStorage.setItem(STORAGE.KEY, JSON.stringify(allHistory));
 	} catch (error) {
 		console.error('Error saving score:', error);
 	}

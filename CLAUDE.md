@@ -361,9 +361,17 @@ npm run dev
 npm run dev -- --host
 ```
 
+or its alias:
+
+```bash
+npm run dev:host
+```
+
 Access via local IP (e.g., http://192.168.1.54:5173) or hostname (e.g., http://medfielder:5173).
 
 The `allowedHosts: true` in vite.config.ts allows any hostname.
+
+**Note:** The `dev:host` script is a convenience alias for `vite dev --host`. The `npm run dev -- --host` syntax works in bash/sh shells but requires quoting in PowerShell: `npm run dev '--' '--host'`.
 
 ## Known Limitations & Future Enhancements
 
@@ -464,7 +472,7 @@ Temporarily add a dev-only block that displays store values as JSON in a `<pre>`
 **Quick start for modifications:**
 
 1. Run `npm install` if first time
-2. Start dev server: `npm run dev -- --host`
+2. Start dev server: `npm run dev` (or `npm run dev:host` for network access)
 3. Find the relevant component in `src/lib/components/`
 4. Understand state flow via `src/lib/stores/gameStore.ts`
 5. Test changes in browser (remember mobile testing!)

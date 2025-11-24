@@ -50,26 +50,31 @@
 		const trimmed = input.trim();
 		if (!trimmed) return [];
 
+		let numbers: number[] = [];
+
 		// Handle range like "3-7"
 		const rangeMatch = trimmed.match(/^(\d+)-(\d+)$/);
 		if (rangeMatch) {
 			const start = parseInt(rangeMatch[1]);
 			const end = parseInt(rangeMatch[2]);
 			if (start > end) return [];
-			return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+			numbers = Array.from({ length: end - start + 1 }, (_, i) => start + i);
 		}
-
 		// Handle comma-separated like "3,4,5" or "3, 4, 5"
-		if (trimmed.includes(',')) {
-			return trimmed
+		else if (trimmed.includes(',')) {
+			numbers = trimmed
 				.split(',')
 				.map(s => parseInt(s.trim()))
 				.filter(n => !isNaN(n) && n > 0);
 		}
-
 		// Handle single number
-		const num = parseInt(trimmed);
-		return isNaN(num) || num <= 0 ? [] : [num];
+		else {
+			const num = parseInt(trimmed);
+			numbers = isNaN(num) || num <= 0 ? [] : [num];
+		}
+
+		// Remove duplicates while preserving order
+		return [...new Set(numbers)];
 	}
 
 	function validateAndStart() {
